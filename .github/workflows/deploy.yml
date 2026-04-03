@@ -25,3 +25,5 @@ jobs:
         service: bankpoint-backend
         region: asia-south1
         image: asia-south1-docker.pkg.dev/onyx-stack-474405-h5/bankpoint/bankpoint-backend:latest
+        env_vars: |
+          FIREBASE_CREDENTIALS=${{ secrets.FIREBASE_CREDENTIALS }}
