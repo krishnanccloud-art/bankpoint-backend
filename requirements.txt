@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+firebase-admin
+python-jose[cryptography]
+passlib[bcrypt]
+pydantic[email]
+python-multipart
+email-validator
