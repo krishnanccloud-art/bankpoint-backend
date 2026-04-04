@@ -5,6 +5,9 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
     - uses: actions/checkout@v4
     - id: auth
@@ -15,10 +18,10 @@ jobs:
       uses: google-github-actions/setup-gcloud@v2
     - name: Configure Docker
       run: gcloud auth configure-docker asia-south1-docker.pkg.dev --quiet
-    - name: Build Docker image
-      run: docker build -t asia-south1-docker.pkg.dev/onyx-stack-474405-h5/bankpoint/bankpoint-backend:latest .
-    - name: Push Docker image
-      run: docker push asia-south1-docker.pkg.dev/onyx-stack-474405-h5/bankpoint/bankpoint-backend:latest
+    - name: Build and Push Docker image
+      run: |
+        docker build -t asia-south1-docker.pkg.dev/onyx-stack-474405-h5/bankpoint/bankpoint-backend:latest .
+        docker push asia-south1-docker.pkg.dev/onyx-stack-474405-h5/bankpoint/bankpoint-backend:latest
     - name: Deploy to Cloud Run
       uses: google-github-actions/deploy-cloudrun@v2
       with:
