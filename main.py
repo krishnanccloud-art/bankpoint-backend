@@ -18,6 +18,11 @@ cred = credentials.Certificate(cred_dict)
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
+# ─── BigQuery Init ───────────────────────────────────────────
+from google.cloud import bigquery
+bq = bigquery.Client(project="onyx-stack-474405-h5")
+BQ_PROJECT = "onyx-stack-474405-h5"
+
 # ─── App Init ────────────────────────────────────────────────
 app = FastAPI(title="BankPoint API", version="1.0.0")
 
@@ -92,12 +97,9 @@ def root():
 @app.post("/auth/register", status_code=201)
 def register(user: UserRegister):
     users_ref = db.collection("users")
-
-    # Check duplicate email
     existing = users_ref.where("email", "==", user.email).get()
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
-
     user_id = str(uuid.uuid4())
     user_data = {
         "user_id": user_id,
@@ -115,14 +117,11 @@ def register(user: UserRegister):
 def login(user: UserLogin):
     users_ref = db.collection("users")
     docs = users_ref.where("email", "==", user.email).get()
-
     if not docs:
         raise HTTPException(status_code=401, detail="Invalid email or password")
-
     user_doc = docs[0].to_dict()
     if not verify_password(user.password, user_doc["password"]):
         raise HTTPException(status_code=401, detail="Invalid email or password")
-
     token = create_token({"user_id": user_doc["user_id"], "email": user_doc["email"]})
     return {
         "message": "Login successful",
@@ -173,28 +172,20 @@ def get_balance(account_id: str, user_id: str = Depends(get_current_user)):
 # ── Transactions ──
 @app.post("/transactions", status_code=201)
 def send_money(txn: TransactionCreate, user_id: str = Depends(get_current_user)):
-    # Get sender's account
     sender_docs = db.collection("accounts").where("user_id", "==", user_id).get()
     if not sender_docs:
         raise HTTPException(status_code=404, detail="Sender account not found")
     sender_ref = db.collection("accounts").document(sender_docs[0].id)
     sender = sender_ref.get().to_dict()
-
     if sender["balance"] < txn.amount:
         raise HTTPException(status_code=400, detail="Insufficient balance")
-
-    # Get receiver's account
     receiver_docs = db.collection("accounts").where("account_number", "==", txn.to_account).get()
     if not receiver_docs:
         raise HTTPException(status_code=404, detail="Receiver account not found")
     receiver_ref = db.collection("accounts").document(receiver_docs[0].id)
     receiver = receiver_ref.get().to_dict()
-
-    # Update balances
     sender_ref.update({"balance": sender["balance"] - txn.amount})
     receiver_ref.update({"balance": receiver["balance"] + txn.amount})
-
-    # Record transaction
     txn_id = str(uuid.uuid4())
     txn_data = {
         "txn_id": txn_id,
@@ -214,3 +205,96 @@ def get_transactions(user_id: str = Depends(get_current_user)):
     docs = db.collection("transactions").where("from_user", "==", user_id).get()
     return {"transactions": [d.to_dict() for d in docs]}
 
+# ─── Analytics Endpoints (BigQuery) ──────────────────────────
+
+@app.get("/analytics/spending")
+def get_spending_summary(user_id: str = Depends(get_current_user)):
+    """User spending summary from BigQuery"""
+    query = f"""
+        SELECT
+            COUNT(*)        AS total_transactions,
+            SUM(amount)     AS total_spent,
+            AVG(amount)     AS avg_transaction,
+            MAX(amount)     AS max_transaction,
+            MIN(amount)     AS min_transaction
+        FROM `{BQ_PROJECT}.bankpoint_raw.transactions`
+        WHERE from_account IN (
+            SELECT account_id FROM `{BQ_PROJECT}.bankpoint_raw.accounts`
+            WHERE user_id = @user_id
+        )
+    """
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[
+            bigquery.ScalarQueryParameter("user_id", "STRING", user_id)
+        ]
+    )
+    rows = list(bq.query(query, job_config=job_config).result())
+    if not rows:
+        return {"message": "No data found"}
+    row = dict(rows[0])
+    return {
+        "total_transactions": row.get("total_transactions", 0),
+        "total_spent":        round(float(row.get("total_spent") or 0), 2),
+        "avg_transaction":    round(float(row.get("avg_transaction") or 0), 2),
+        "max_transaction":    round(float(row.get("max_transaction") or 0), 2),
+        "min_transaction":    round(float(row.get("min_transaction") or 0), 2),
+    }
+
+@app.get("/analytics/daily")
+def get_daily_summary(_: str = Depends(get_current_user)):
+    """Daily transaction summary from BigQuery"""
+    query = f"""
+        SELECT
+            DATE(created_at)         AS txn_date,
+            COUNT(*)                 AS total_transactions,
+            SUM(amount)              AS total_volume,
+            AVG(amount)              AS avg_amount
+        FROM `{BQ_PROJECT}.bankpoint_raw.transactions`
+        WHERE created_at IS NOT NULL
+        GROUP BY txn_date
+        ORDER BY txn_date DESC
+        LIMIT 30
+    """
+    rows = list(bq.query(query).result())
+    return {
+        "daily_summary": [
+            {
+                "date":               str(row["txn_date"]),
+                "total_transactions": row["total_transactions"],
+                "total_volume":       round(float(row["total_volume"] or 0), 2),
+                "avg_amount":         round(float(row["avg_amount"] or 0), 2),
+            }
+            for row in rows
+        ]
+    }
+
+@app.get("/analytics/balance")
+def get_balance_snapshot(user_id: str = Depends(get_current_user)):
+    """Account balance snapshot from BigQuery"""
+    query = f"""
+        SELECT
+            account_id,
+            account_type,
+            balance,
+            created_at
+        FROM `{BQ_PROJECT}.bankpoint_raw.accounts`
+        WHERE user_id = @user_id
+        ORDER BY balance DESC
+    """
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[
+            bigquery.ScalarQueryParameter("user_id", "STRING", user_id)
+        ]
+    )
+    rows = list(bq.query(query, job_config=job_config).result())
+    return {
+        "accounts": [
+            {
+                "account_id":   row["account_id"],
+                "account_type": row["account_type"],
+                "balance":      round(float(row["balance"] or 0), 2),
+                "created_at":   str(row["created_at"]),
+            }
+            for row in rows
+        ]
+    }
