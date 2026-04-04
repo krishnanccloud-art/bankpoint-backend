@@ -7,27 +7,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-
     - id: auth
       uses: google-github-actions/auth@v2
       with:
         credentials_json: ${{ secrets.GCP_SA_KEY }}
-
     - name: Set up Cloud SDK
       uses: google-github-actions/setup-gcloud@v2
-
-    - name: Docker Login
-      run: |
-        echo '${{ secrets.GCP_SA_KEY }}' | docker login -u _json_key --password-stdin https://asia-south1-docker.pkg.dev
-
+    - name: Configure Docker
+      run: gcloud auth configure-docker asia-south1-docker.pkg.dev --quiet
     - name: Build Docker image
-      run: |
-        docker build -t asia-south1-docker.pkg.dev/onyx-stack-474405-h5/bankpoint/bankpoint-backend:latest .
-
+      run: docker build -t asia-south1-docker.pkg.dev/onyx-stack-474405-h5/bankpoint/bankpoint-backend:latest .
     - name: Push Docker image
-      run: |
-        docker push asia-south1-docker.pkg.dev/onyx-stack-474405-h5/bankpoint/bankpoint-backend:latest
-
+      run: docker push asia-south1-docker.pkg.dev/onyx-stack-474405-h5/bankpoint/bankpoint-backend:latest
     - name: Deploy to Cloud Run
       uses: google-github-actions/deploy-cloudrun@v2
       with:
