@@ -6,3 +6,5 @@ passlib[bcrypt]
 pydantic[email]
 python-multipart
 email-validator
+
+google-cloud-bigquery
