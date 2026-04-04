@@ -12,13 +12,13 @@ jobs:
         credentials_json: ${{ secrets.GCP_SA_KEY }}
     - uses: google-github-actions/setup-gcloud@v2
     - run: gcloud auth configure-docker asia-south1-docker.pkg.dev --quiet
-    - run: docker build -t asia-south1-docker.pkg.dev/onyx-stack-474405-h5/bankpoint/bankpoint-backend:latest .
-    - run: gcloud artifacts docker images list asia-south1-docker.pkg.dev/onyx-stack-474405-h5/bankpoint --quiet || true
-    - run: docker push asia-south1-docker.pkg.dev/onyx-stack-474405-h5/bankpoint/bankpoint-backend:latest
+    - run: docker build -t asia-south1-docker.pkg.dev/onyx-stack-474405-h5/bankpoint-backend/bankpoint-backend:latest .
+    - run: gcloud artifacts docker images list asia-south1-docker.pkg.dev/onyx-stack-474405-h5/bankpoint-backend --quiet || true
+    - run: docker push asia-south1-docker.pkg.dev/onyx-stack-474405-h5/bankpoint-backend/bankpoint-backend:latest
     - uses: google-github-actions/deploy-cloudrun@v2
       with:
         service: bankpoint-backend
         region: asia-south1
-        image: asia-south1-docker.pkg.dev/onyx-stack-474405-h5/bankpoint/bankpoint-backend:latest
+        image: asia-south1-docker.pkg.dev/onyx-stack-474405-h5/bankpoint-backend/bankpoint-backend:latest
         secrets: |
           FIREBASE_CREDENTIALS=firebase-credentials:latest
