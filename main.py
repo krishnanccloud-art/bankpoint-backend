@@ -12,16 +12,14 @@ import uuid
 import os
 
 # ─── Firebase Init ───────────────────────────────────────────
-import json
-cred_dict = json.loads(os.environ.get("FIREBASE_CREDENTIALS"))
-cred = credentials.Certificate(cred_dict)
+cred = credentials.Certificate("serviceAccountKey.json")
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
 # ─── BigQuery Init ───────────────────────────────────────────
-from google.cloud import bigquery
-bq = bigquery.Client(project="onyx-stack-474405-h5")
-BQ_PROJECT = "onyx-stack-474405-h5"
+# from google.cloud import bigquery
+# bq = bigquery.Client(project="onyx-stack-474405-h5")
+# BQ_PROJECT = "onyx-stack-474405-h5"
 
 # ─── App Init ────────────────────────────────────────────────
 app = FastAPI(title="BankPoint API", version="1.0.0")
