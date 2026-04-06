@@ -286,3 +286,19 @@ def get_transactions(user_id: str = Depends(get_current_user)):
         for d in db.collection("transactions").where("from_user", "==", user_id).get()
     ]
     return {"transactions": txns}
+    @app.post("/accounts/{account_number}/deposit")
+async def deposit(account_number: str, request: Request, current_user=Depends(get_current_user)):
+    data = await request.json()
+    amount = data.get("amount", 0)
+    
+    accounts_ref = db.collection("accounts")
+    query = accounts_ref.where("account_number", "==", account_number).limit(1).get()
+    
+    if not query:
+        raise HTTPException(status_code=404, detail="Account not found")
+    
+    doc = query[0]
+    current_balance = doc.to_dict().get("balance", 0)
+    doc.reference.update({"balance": current_balance + amount})
+    
+    return {"message": "Deposit successful", "new_balance": current_balance + amount}
