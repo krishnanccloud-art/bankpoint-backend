@@ -29,10 +29,7 @@ db = firestore.client()
 app = FastAPI(title="BankPoint API", version="1.0.0")
 
 # ✅ FIX 1: CORS — only allow known frontend origins
-ALLOWED_ORIGINS = os.getenv(
-    "ALLOWED_ORIGINS",
-    "http://localhost:3000,http://localhost:5500"  # default for local dev
-).split(",")
+ALLOWED_ORIGINS = ["*"]
 
 app.add_middleware(
     CORSMiddleware,
