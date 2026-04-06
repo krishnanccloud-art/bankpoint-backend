@@ -286,7 +286,7 @@ def get_transactions(user_id: str = Depends(get_current_user)):
         for d in db.collection("transactions").where("from_user", "==", user_id).get()
     ]
     return {"transactions": txns}
-    @app.post("/accounts/{account_number}/deposit")
+@app.post("/accounts/{account_number}/deposit")
 async def deposit(account_number: str, request: Request, current_user=Depends(get_current_user)):
     data = await request.json()
     amount = data.get("amount", 0)
